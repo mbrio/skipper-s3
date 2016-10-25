@@ -9,8 +9,6 @@ var concat = require('concat-stream');
 var _ = require('lodash');
 _.defaultsDeep = require('merge-defaults');
 var knox = require('knox');
-var S3MultipartUpload = require('knox-mpu-alt');
-var S3Lister = require('s3-lister');
 var mime = require('mime');
 
 /**
@@ -126,9 +124,6 @@ module.exports = function SkipperS3 (globalOpts) {
         endpoint: globalOpts.endpoint,
         token: globalOpts.token||undefined
       });
-
-      // TODO: take a look at maxKeys
-      // https://www.npmjs.org/package/s3-lister
 
       // Allow empty dirname (defaults to `/`)
       if (!dirname) {
