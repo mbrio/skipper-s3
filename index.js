@@ -228,55 +228,51 @@ module.exports = function SkipperS3 (globalOpts) {
         // Skipper core should gc() for us.
       });
 
-      // Allow `tmpdir` for knox-mpu to be passed in, or default
-      // to `.tmp/s3-upload-part-queue`
-      options.tmpdir = options.tmpdir || path.resolve(process.cwd(), '.tmp/s3-upload-part-queue');
-
       var headers = options.headers || {};
+
 
       // Lookup content type with mime if not set
       if ('undefined' === typeof headers['content-type']) {
         headers['content-type'] = mime.lookup(__newFile.fd);
       }
 
-      var mpu = new S3MultipartUpload({
-        objectName: __newFile.fd,
-        stream: __newFile,
-        maxUploadSize: options.maxBytes,
-        tmpDir: options.tmpdir,
-        headers: headers,
-        client: knox.createClient({
-          key: options.key,
-          secret: options.secret,
-          bucket: options.bucket,
-          region: globalOpts.region||undefined,
-          endpoint: globalOpts.endpoint||undefined,
-          token: globalOpts.token||undefined
-        })
-      }, function (err, body) {
-        if (err) {
-          // console.log(('Receiver: Error writing `' + __newFile.filename + '`:: ' + require('util').inspect(err) + ' :: Cancelling upload and cleaning up already-written bytes...').red);
-          receiver__.emit('error', err);
-          return;
-        }
+      // Set content length
+      if ('undefined' === typeof headers['content-length']) {
+        headers['content-length'] = __newFile.byteCount;
+      }
 
-        // Package extra metadata about the S3 response on each file stream
-        // in case we decide we want to use it for something later
-        __newFile.extra = body;
-
-        // console.log(('Receiver: Finished writing `' + __newFile.filename + '`').grey);
-
-
-        // console.timeEnd('fileupload:'+__newFile.filename);
-        var endedAt = new Date();
-        var duration = ((endedAt - startedAt) / 1000);
-        // console.log('**** S3 upload took '+duration+' seconds...');
-
-        next();
+      var kclient = knox.createClient({
+        key: options.key,
+        secret: options.secret,
+        bucket: options.bucket,
+        region: globalOpts.region||undefined,
+        endpoint: globalOpts.endpoint||undefined,
+        token: globalOpts.token||undefined
       });
 
+      var upstream = kclient.putStream(__newFile, __newFile.fd, headers, function(err, body) {
+          if (err) {
+            // console.log(('Receiver: Error writing `' + __newFile.filename + '`:: ' + require('util').inspect(err) + ' :: Cancelling upload and cleaning up already-written bytes...').red);
+            receiver__.emit('error', err);
+            return;
+          }
 
-      mpu.on('progress', function(data) {
+          // Package extra metadata about the S3 response on each file stream
+          // in case we decide we want to use it for something later
+          __newFile.extra = body;
+
+          // console.log(('Receiver: Finished writing `' + __newFile.filename + '`').grey);
+
+
+          // console.timeEnd('fileupload:'+__newFile.filename);
+          var endedAt = new Date();
+          var duration = ((endedAt - startedAt) / 1000);
+          // console.log('**** S3 upload took '+duration+' seconds...');
+
+          next();
+      });
+
+      upstream.on('progress', function(data) {
         var snapshot = new Date();
         var secondsElapsed = ((snapshot - startedAt) / 1000);
         var estUploadRate = (data.written/1000) / secondsElapsed;
@@ -299,5 +295,3 @@ module.exports = function SkipperS3 (globalOpts) {
 
 
 };
-
-
