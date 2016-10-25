@@ -9,6 +9,7 @@ var concat = require('concat-stream');
 var _ = require('lodash');
 _.defaultsDeep = require('merge-defaults');
 var knox = require('knox');
+var S3Lister = require('s3-lister');
 var mime = require('mime');
 
 /**
